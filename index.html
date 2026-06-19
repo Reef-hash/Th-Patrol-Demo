@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHPATROL - Sistem Pengawasan Keselamatan</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+.glass { background:rgba(255,255,255,0.85); backdrop-filter:blur(12px); }
+.glass-dark { background:rgba(15,23,42,0.85); backdrop-filter:blur(12px); }
+.slide-in { animation:slideIn 0.3s ease-out; }
+@keyframes slideIn { from { opacity:0; transform:translateY(10px);} to { opacity:1; transform:translateY(0);} }
+.fade-in { animation:fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity:0;} to { opacity:1;} }
+.toast-enter { animation:toastEnter 0.3s ease-out forwards; }
+@keyframes toastEnter { from { transform:translateX(100%); opacity:0;} to { transform:translateX(0); opacity:1;} }
+.map-grid { background-image:radial-gradient(circle,#cbd5e1 1px,transparent 1px); background-size:20px 20px; }
+.status-dot { box-shadow:0 0 0 0 rgba(34,197,94,0.7); animation:statusPulse 2s infinite; }
+@keyframes statusPulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,0.7);} 70%{box-shadow:0 0 0 10px rgba(34,197,94,0);} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0);} }
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:#f1f5f9; }
+::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+
+<div id="toastContainer" class="fixed top-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none"></div>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
+<div class="absolute inset-0 opacity-20">
+<div class="absolute top-20 left-20 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse"></div>
+<div class="absolute bottom-20 right-20 w-72 h-72 bg-emerald-500 rounded-full mix-blend-multiply filter blur-3xl animate-pulse" style="animation-delay:1s"></div>
+</div>
+<div class="relative z-10 w-full max-w-md p-8 mx-4">
+<div class="glass-dark rounded-2xl p-8 shadow-2xl border border-white/10">
+<div class="text-center mb-8">
+<div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-500 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg mb-4">
+<i class="fas fa-shield-halved text-3xl text-white"></i>
+</div>
+<h1 class="text-3xl font-bold text-white tracking-tight">PHPATROL</h1>
+<p class="text-slate-400 mt-2 text-sm">Sistem Pengawasan & Rondaan Keselamatan</p>
+</div>
+<form id="loginForm" class="space-y-5">
+<div>
+<label class="block text-sm font-medium text-slate-300 mb-2">ID Pengguna</label>
+<div class="relative">
+<i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+<input type="text" id="loginUser" value="admin" class="w-full pl-11 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-300 mb-2">Kata Laluan</label>
+<div class="relative">
+<i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-500"></i>
+<input type="password" id="loginPass" value="password" class="w-full pl-11 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+</div>
+</div>
+<div class="flex items-center justify-between text-sm">
+<label class="flex items-center text-slate-400 cursor-pointer"><input type="checkbox" class="mr-2 rounded border-slate-600 bg-slate-800 text-blue-500"> Ingat Saya</label>
+<a href="#" class="text-blue-400 hover:text-blue-300 transition-colors">Lupa Kata Laluan?</a>
+</div>
+<button type="submit" class="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-semibold rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+<i class="fas fa-sign-in-alt mr-2"></i>Log Masuk
+</button>
+</form>
+<p class="mt-6 text-center text-xs text-slate-500">Versi 2.4.1 &bull; Hak Cipta Terpelihara &copy; 2026</p>
+</div>
+</div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" class="hidden">
+<!-- Sidebar -->
+<aside id="sidebar" class="fixed left-0 top-0 h-full w-72 bg-white border-r border-slate-200 z-40 transition-transform duration-300 lg:translate-x-0 -translate-x-full">
+<div class="h-16 flex items-center px-6 border-b border-slate-100">
+<div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-emerald-500 rounded-lg flex items-center justify-center mr-3">
+<i class="fas fa-shield-halved text-white text-sm"></i>
+</div>
+<div>
+<h1 class="font-bold text-lg text-slate-800 leading-tight">PHPATROL</h1>
+<p class="text-[10px] text-slate-500 font-medium tracking-wider">SISTEM KAWALAN</p>
+</div>
+<button id="closeSidebar" class="lg:hidden ml-auto text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+</div>
+<div class="p-4">
+<p class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 px-3">Menu Utama</p>
+<nav class="space-y-1">
+<button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all active-nav">
+<i class="fas fa-chart-line w-5 text-center mr-3 text-slate-400"></i>Papan Pemuka
+</button>
+<button onclick="switchTab('patrol')" data-tab="patrol" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all">
+<i class="fas fa-route w-5 text-center mr-3 text-slate-400"></i>Rondaan
+</button>
+<button onclick="switchTab('guards')" data-tab="guards" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all">
+<i class="fas fa-user-shield w-5 text-center mr-3 text-slate-400"></i>Pengawal
+</button>
+<button onclick="switchTab('incidents')" data-tab="incidents" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all">
+<i class="fas fa-exclamation-triangle w-5 text-center mr-3 text-slate-400"></i>Kejadian
+<span id="incidentBadge" class="ml-auto bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full hidden">0</span>
+</button>
+<button onclick="switchTab('checkpoints')" data-tab="checkpoints" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all">
+<i class="fas fa-map-marker-alt w-5 text-center mr-3 text-slate-400"></i>Pusat Pemeriksaan
+</button>
+<button onclick="switchTab('reports')" data-tab="reports" class="nav-item w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-all">
+<i class="fas fa-file-alt w-5 text-center mr-3 text-slate-400"></i>Laporan
+</button>
+</nav>
+</div>
+<div class="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-100 bg-white">
+<div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50">
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-emerald-400 flex items-center justify-center text-white font-bold text-sm">AD</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-semibold text-slate-800 truncate">Admin Utama</p>
+<p class="text-xs text-slate-500 truncate">Pentadbir Sistem</p>
+</div>
+<button onclick="logout()" class="text-slate-400 hover:text-red-500 transition-colors p-2"><i class="fas fa-sign-out-alt"></i></button>
+</div>
+</div>
+</aside>
+
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-30 hidden lg:hidden backdrop-blur-sm"></div>
+
+<main class="lg:ml-72 min-h-screen">
+<header class="sticky top-0 z-20 glass border-b border-slate-200/60">
+<div class="flex items-center justify-between h-16 px-6">
+<div class="flex items-center gap-4">
+<button id="menuBtn" class="lg:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"><i class="fas fa-bars text-xl"></i></button>
+<div>
+<h2 id="pageTitle" class="text-xl font-bold text-slate-800">Papan Pemuka</h2>
+<p id="pageSubtitle" class="text-xs text-slate-500">Ringkasan sistem keselamatan</p>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
+<span class="w-2 h-2 rounded-full bg-emerald-500 status-dot"></span>
+<span class="text-xs font-semibold text-emerald-700">Sistem Aktif</span>
+</div>
+<button onclick="toggleNotifications()" class="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors">
+<i class="fas fa-bell text-lg"></i>
+<span id="notifBadge" class="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center hidden">3</span>
+</button>
+<div class="hidden sm:flex items-center gap-2 text-sm text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
+<i class="far fa-clock text-slate-400"></i><span id="liveClock">--:--:--</span>
+</div>
+</div>
+</div>
+</header>
+
+<div class="p-6">
+<!-- DASHBOARD -->
+<div id="tab-dashboard" class="tab-content">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between mb-3">
+<div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center"><i class="fas fa-user-shield text-blue-600"></i></div>
+<span class="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+2 hari ini</span>
+</div>
+<p class="text-2xl font-bold text-slate-800">24</p>
+<p class="text-sm text-slate-500">Pengawal Aktif</p>
+</div>
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between mb-3">
+<div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center"><i class="fas fa-route text-emerald-600"></i></div>
+<span class="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">Dalam proses</span>
+</div>
+<p class="text-2xl font-bold text-slate-800">8</p>
+<p class="text-sm text-slate-500">Rondaan Berjalan</p>
+</div>
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between mb-3">
+<div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center"><i class="fas fa-exclamation-triangle text-red-600"></i></div>
+<span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full">Perlu tindakan</span>
+</div>
+<p class="text-2xl font-bold text-slate-800" id="dashIncidentCount">3</p>
+<p class="text-sm text-slate-500">Kejadian Baharu</p>
+</div>
+<div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+<div class="flex items-center justify-between mb-3">
+<div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center"><i class="fas fa-map-marker-alt text-purple-600"></i></div>
+<span class="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full">Jumlah</span>
+</div>
+<p class="text-2xl font-bold text-slate-800">42</p>
+<p class="text-sm text-slate-500">Pusat Pemeriksaan</p>
+</div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+<div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<div>
+<h3 class="font-bold text-slate-800">Peta Rondaan Langsung</h3>
+<p class="text-xs text-slate-500">Kawasan keselamatan Zon A - Zon D</p>
+</div>
+<div class="flex items-center gap-2 text-xs text-slate-500">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Rondaan</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Pusat</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Kejadian</span>
+</div>
+</div>
+<div class="relative h-96 map-grid bg-slate-50 overflow-hidden">
+<div class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-semibold text-slate-600"><i class="fas fa-map mr-1 text-blue-500"></i>Zon A</div>
+<div class="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-semibold text-slate-600"><i class="fas fa-map mr-1 text-emerald-500"></i>Zon B</div>
+<div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-semibold text-slate-600"><i class="fas fa-map mr-1 text-amber-500"></i>Zon C</div>
+<div class="absolute bottom-4 right-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-xs font-semibold text-slate-600"><i class="fas fa-map mr-1 text-purple-500"></i>Zon D</div>
+<div class="absolute top-[20%] left-[25%] transform -translate-x-1/2 -translate-y-1/2"><div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div></div>
+<div class="absolute top-[35%] left-[55%] transform -translate-x-1/2 -translate-y-1/2"><div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div></div>
+<div class="absolute top-[60%] left-[30%] transform -translate-x-1/2 -translate-y-1/2"><div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div></div>
+<div class="absolute top-[70%] left-[70%] transform -translate-x-1/2 -translate-y-1/2"><div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div></div>
+<div class="absolute top-[45%] left-[80%] transform -translate-x-1/2 -translate-y-1/2"><div class="w-4 h-4 bg-emerald-500 rounded-full border-2 border-white shadow-lg"></div></div>
+<div class="absolute top-[25%] left-[30%] animate-pulse">
+<div class="w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"><i class="fas fa-walking text-white text-[8px]"></i></div>
+<div class="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">PG-05</div>
+</div>
+<div class="absolute top-[50%] left-[45%] animate-pulse" style="animation-delay:0.5s">
+<div class="w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"><i class="fas fa-walking text-white text-[8px]"></i></div>
+<div class="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">PG-12</div>
+</div>
+<div class="absolute top-[65%] left-[65%] animate-pulse" style="animation-delay:1s">
+<div class="w-5 h-5 bg-blue-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center"><i class="fas fa-walking text-white text-[8px]"></i></div>
+<div class="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">PG-08</div>
+</div>
+<div class="absolute top-[40%] left-[35%]">
+<div class="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center animate-bounce"><i class="fas fa-exclamation text-white text-xs"></i></div>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100">
+<h3 class="font-bold text-slate-800">Aktiviti Terkini</h3>
+<p class="text-xs text-slate-500">Log sistem 24 jam terakhir</p>
+</div>
+<div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+<div class="flex gap-3 p-3 rounded-xl bg-slate-50">
+<div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-check text-emerald-600 text-xs"></i></div>
+<div class="min-w-0">
+<p class="text-sm font-medium text-slate-800 truncate">Pemeriksaan CP-03 berjaya</p>
+<p class="text-xs text-slate-500">Pengawal Ahmad &bull; 2 minit lalu</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-xl bg-slate-50">
+<div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-play text-blue-600 text-xs"></i></div>
+<div class="min-w-0">
+<p class="text-sm font-medium text-slate-800 truncate">Rondaan Zon B dimulakan</p>
+<p class="text-xs text-slate-500">Pengawal Rajesh &bull; 15 minit lalu</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-xl bg-red-50 border border-red-100">
+<div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-exclamation-triangle text-red-600 text-xs"></i></div>
+<div class="min-w-0">
+<p class="text-sm font-medium text-red-700 truncate">Pintu belakang tidak dikunci</p>
+<p class="text-xs text-red-500">Zon C &bull; 32 minit lalu</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-xl bg-slate-50">
+<div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-camera text-purple-600 text-xs"></i></div>
+<div class="min-w-0">
+<p class="text-sm font-medium text-slate-800 truncate">Gambar disahkan di CP-07</p>
+<p class="text-xs text-slate-500">Pengawal Sarah &bull; 1 jam lalu</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 rounded-xl bg-slate-50">
+<div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0"><i class="fas fa-clock text-amber-600 text-xs"></i></div>
+<div class="min-w-0">
+<p class="text-sm font-medium text-slate-800 truncate">Rondaan Zon A tamat</p>
+<p class="text-xs text-slate-500">Pengawal Tan &bull; 2 jam lalu</p>
+</div>
+</div>
+</div>
+<div class="px-6 py-3 border-t border-slate-100">
+<button onclick="switchTab('patrol')" class="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1">Lihat Semua Aktiviti <i class="fas fa-arrow-right text-xs"></i></button>
+</div>
+</div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<div>
+<h3 class="font-bold text-slate-800">Status Rondaan Hari Ini</h3>
+<p class="text-xs text-slate-500">20 Jun 2026 &bull; Shift Petang</p>
+</div>
+<button onclick="refreshData()" class="p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"><i class="fas fa-sync-alt" id="refreshIcon"></i></button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+<thead>
+<tr class="bg-slate-50 text-slate-600">
+<th class="px-6 py-3 text-left font-semibold">ID</th>
+<th class="px-6 py-3 text-left font-semibold">Pengawal</th>
+<th class="px-6 py-3 text-left font-semibold">Zon</th>
+<th class="px-6 py-3 text-left font-semibold">Masa Mula</th>
+<th class="px-6 py-3 text-left font-semibold">Pusat Pemeriksaan</th>
+<th class="px-6 py-3 text-left font-semibold">Status</th>
+<th class="px-6 py-3 text-left font-semibold">Tindakan</th>
+</tr>
+</thead>
+<tbody id="patrolTableBody" class="divide-y divide-slate-100"></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- PATROL -->
+<div id="tab-patrol" class="tab-content hidden">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 space-y-6">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="font-bold text-slate-800 text-lg">Rondaan Aktif</h3>
+<p class="text-sm text-slate-500">Senarai rondaan yang sedang berjalan</p>
+</div>
+<button onclick="startNewPatrol()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Mula Rondaan Baharu</button>
+</div>
+<div class="space-y-4" id="activePatrols"></div>
+</div>
+</div>
+<div class="space-y-6">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+<h3 class="font-bold text-slate-800 mb-4">Prestasi Rondaan</h3>
+<div class="space-y-4">
+<div>
+<div class="flex justify-between text-sm mb-1"><span class="text-slate-600">Kadar Penyelesaian</span><span class="font-semibold text-emerald-600">94%</span></div>
+<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:94%"></div></div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-1"><span class="text-slate-600">Ketepatan Masa</span><span class="font-semibold text-blue-600">87%</span></div>
+<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:87%"></div></div>
+</div>
+<div>
+<div class="flex justify-between text-sm mb-1"><span class="text-slate-600">Pemeriksaan RFID</span><span class="font-semibold text-purple-600">100%</span></div>
+<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-purple-500 rounded-full" style="width:100%"></div></div>
+</div>
+</div>
+</div>
+<div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 text-white">
+<h3 class="font-bold text-lg mb-2">Shift Seterusnya</h3>
+<div class="flex items-center gap-3 mb-4">
+<div class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center"><i class="fas fa-moon text-xl"></i></div>
+<div><p class="font-semibold">Shift Malam</p><p class="text-blue-200 text-sm">22:00 - 06:00</p></div>
+</div>
+<div class="space-y-2 text-sm">
+<div class="flex items-center gap-2"><i class="fas fa-user text-blue-300 w-4"></i><span>6 Pengawal dijadualkan</span></div>
+<div class="flex items-center gap-2"><i class="fas fa-route text-blue-300 w-4"></i><span>4 Laluan rondaan</span></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- GUARDS -->
+<div id="tab-guards" class="tab-content hidden">
+<div class="flex items-center justify-between mb-6">
+<div class="relative flex-1 max-w-md">
+<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+<input type="text" id="guardSearch" oninput="filterGuards()" placeholder="Cari pengawal..." class="w-full pl-11 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+</div>
+<div class="flex gap-2 ml-4">
+<select id="guardFilter" onchange="filterGuards()" class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+<option value="all">Semua Status</option>
+<option value="active">Aktif</option>
+<option value="offduty">Tidak Bertugas</option>
+<option value="leave">Cuti</option>
+</select>
+<button onclick="addGuard()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Tambah Pengawal</button>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5" id="guardsGrid"></div>
+</div>
+
+<!-- INCIDENTS -->
+<div id="tab-incidents" class="tab-content hidden">
+<div class="flex items-center justify-between mb-6">
+<div class="flex gap-2">
+<button onclick="filterIncidents('all')" class="incident-filter px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white transition-colors" data-filter="all">Semua</button>
+<button onclick="filterIncidents('open')" class="incident-filter px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors" data-filter="open">Belum Selesai</button>
+<button onclick="filterIncidents('resolved')" class="incident-filter px-4 py-2 rounded-xl text-sm font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-colors" data-filter="resolved">Selesai</button>
+</div>
+<button onclick="reportIncident()" class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"><i class="fas fa-plus"></i> Laporkan Kejadian</button>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2 space-y-4" id="incidentsList"></div>
+<div class="space-y-6">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+<h3 class="font-bold text-slate-800 mb-4">Ringkasan Kejadian</h3>
+<div class="space-y-3">
+<div class="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-100">
+<div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center"><i class="fas fa-exclamation text-red-600 text-xs"></i></div><span class="text-sm font-medium text-slate-700">Tinggi</span></div>
+<span class="text-lg font-bold text-red-600" id="highCount">1</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-amber-50 border border-amber-100">
+<div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center"><i class="fas fa-exclamation text-amber-600 text-xs"></i></div><span class="text-sm font-medium text-slate-700">Sederhana</span></div>
+<span class="text-lg font-bold text-amber-600" id="mediumCount">1</span>
+</div>
+<div class="flex items-center justify-between p-3 rounded-xl bg-blue-50 border border-blue-100">
+<div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"><i class="fas fa-info text-blue-600 text-xs"></i></div><span class="text-sm font-medium text-slate-700">Rendah</span></div>
+<span class="text-lg font-bold text-blue-600" id="lowCount">1</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- CHECKPOINTS -->
+<div id="tab-checkpoints" class="tab-content hidden">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<div class="lg:col-span-2">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<div><h3 class="font-bold text-slate-800">Senarai Pusat Pemeriksaan</h3><p class="text-xs text-slate-500">42 pusat pemeriksaan aktif</p></div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+<thead><tr class="bg-slate-50 text-slate-600">
+<th class="px-6 py-3 text-left font-semibold">ID</th>
+<th class="px-6 py-3 text-left font-semibold">Nama</th>
+<th class="px-6 py-3 text-left font-semibold">Zon</th>
+<th class="px-6 py-3 text-left font-semibold">Jenis</th>
+<th class="px-6 py-3 text-left font-semibold">Status</th>
+<th class="px-6 py-3 text-left font-semibold">Pemeriksaan Terakhir</th>
+</tr></thead>
+<tbody id="checkpointsTable" class="divide-y divide-slate-100"></tbody>
+</table>
+</div>
+</div>
+</div>
+<div>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+<h3 class="font-bold text-slate-800 mb-4">Status Pusat Pemeriksaan</h3>
+<div class="grid grid-cols-2 gap-3">
+<div class="text-center p-4 rounded-xl bg-emerald-50 border border-emerald-100"><p class="text-2xl font-bold text-emerald-600">38</p><p class="text-xs text-emerald-700 font-medium">Aktif</p></div>
+<div class="text-center p-4 rounded-xl bg-amber-50 border border-amber-100"><p class="text-2xl font-bold text-amber-600">3</p><p class="text-xs text-amber-700 font-medium">Penyelenggaraan</p></div>
+<div class="text-center p-4 rounded-xl bg-red-50 border border-red-100"><p class="text-2xl font-bold text-red-600">1</p><p class="text-xs text-red-700 font-medium">Rosak</p></div>
+<div class="text-center p-4 rounded-xl bg-slate-50 border border-slate-200"><p class="text-2xl font-bold text-slate-600">42</p><p class="text-xs text-slate-700 font-medium">Jumlah</p></div>
+</div>
+</div>
+<div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-6 text-white">
+<h3 class="font-bold text-lg mb-3">Pemeriksaan RFID</h3>
+<p class="text-emerald-100 text-sm mb-4">Imbas tag RFID di setiap pusat pemeriksaan untuk mengesahkan rondaan.</p>
+<div class="flex items-center gap-3 p-3 bg-white/10 rounded-xl">
+<div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center"><i class="fas fa-wifi"></i></div>
+<div><p class="font-semibold text-sm">Pembaca RFID</p><p class="text-xs text-emerald-200">Semua peranti aktif</p></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- REPORTS -->
+<div id="tab-reports" class="tab-content hidden">
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+<div class="lg:col-span-1 space-y-4">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+<h3 class="font-bold text-slate-800 mb-4">Jenis Laporan</h3>
+<nav class="space-y-2">
+<button class="w-full text-left px-4 py-3 rounded-xl bg-blue-50 text-blue-700 font-medium text-sm flex items-center gap-2"><i class="fas fa-calendar-day w-4"></i> Laporan Harian</button>
+<button class="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium text-sm flex items-center gap-2"><i class="fas fa-calendar-week w-4"></i> Laporan Mingguan</button>
+<button class="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium text-sm flex items-center gap-2"><i class="fas fa-calendar-alt w-4"></i> Laporan Bulanan</button>
+<button class="w-full text-left px-4 py-3 rounded-xl hover:bg-slate-50 text-slate-600 font-medium text-sm flex items-center gap-2"><i class="fas fa-exclamation-triangle w-4"></i> Laporan Kejadian</button>
+</nav>
+</div>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+<h3 class="font-bold text-slate-800 mb-3">Eksport</h3>
+<div class="space-y-2">
+<button class="w-full py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2"><i class="fas fa-file-pdf text-red-500"></i> PDF</button>
+<button class="w-full py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2"><i class="fas fa-file-excel text-emerald-600"></i> Excel</button>
+<button class="w-full py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-2"><i class="fas fa-file-csv text-blue-600"></i> CSV</button>
+</div>
+</div>
+</div>
+<div class="lg:col-span-3">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+<div class="flex items-center justify-between mb-6">
+<div><h3 class="font-bold text-slate-800 text-lg">Laporan Harian</h3><p class="text-sm text-slate-500">20 Jun 2026</p></div>
+<div class="flex gap-2">
+<input type="date" value="2026-06-20" class="px-3 py-2 border border-slate-200 rounded-lg text-sm">
+<button class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg"><i class="fas fa-filter mr-1"></i> Tapis</button>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="p-4 rounded-xl bg-slate-50 text-center"><p class="text-2xl font-bold text-slate-800">16</p><p class="text-xs text-slate-500">Rondaan Selesai</p></div>
+<div class="p-4 rounded-xl bg-slate-50 text-center"><p class="text-2xl font-bold text-slate-800">8</p><p class="text-xs text-slate-500">Dalam Proses</p></div>
+<div class="p-4 rounded-xl bg-slate-50 text-center"><p class="text-2xl font-bold text-slate-800">504</p><p class="text-xs text-slate-500">Pemeriksaan RFID</p></div>
+<div class="p-4 rounded-xl bg-slate-50 text-center"><p class="text-2xl font-bold text-red-600">3</p><p class="text-xs text-slate-500">Kejadian</p></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+<!-- MODALS -->
+<div id="modalOverlay" class="fixed inset-0 bg-black/50 z-[60] hidden backdrop-blur-sm flex items-center justify-center p-4">
+<!-- Start Patrol Modal -->
+<div id="startPatrolModal" class="modal-content hidden bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden slide-in">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<h3 class="font-bold text-slate-800">Mula Rondaan Baharu</h3>
+<button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+</div>
+<div class="p-6 space-y-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Pilih Pengawal</label>
+<select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+<option>Pilih pengawal...</option>
+<option>Ahmad bin Ismail (PG-05)</option>
+<option>Rajesh a/l Kumar (PG-12)</option>
+<option>Sarah binti Abdullah (PG-08)</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Zon Rondaan</label>
+<select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+<option>Pilih zon...</option>
+<option>Zon A - Bangunan Utama</option>
+<option>Zon B - Kawasan Parkir</option>
+<option>Zon C - Gudang & Stor</option>
+<option>Zon D - Kawasan Perimeter</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Shift</label>
+<select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+<option>Pagi (06:00 - 14:00)</option>
+<option selected>Petang (14:00 - 22:00)</option>
+<option>Malam (22:00 - 06:00)</option>
+</select>
+</div>
+</div>
+<div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+<button onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-white">Batal</button>
+<button onclick="confirmStartPatrol()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl">Mula Rondaan</button>
+</div>
+</div>
+
+<!-- Report Incident Modal -->
+<div id="reportIncidentModal" class="modal-content hidden bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden slide-in">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-red-50">
+<h3 class="font-bold text-red-700"><i class="fas fa-exclamation-triangle mr-2"></i>Laporkan Kejadian</h3>
+<button onclick="closeModal()" class="text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
+</div>
+<div class="p-6 space-y-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Jenis Kejadian</label>
+<select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+<option>Cubaan Pecah Masuk</option>
+<option>Kerosakan Harta Benda</option>
+<option>Kebakaran / Asap</option>
+<option>Penceroboh</option>
+<option>Lain-lain</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Tahap Keseriusan</label>
+<div class="flex gap-2">
+<button class="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-blue-50">Rendah</button>
+<button class="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-amber-50">Sederhana</button>
+<button class="flex-1 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-red-50">Tinggi</button>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Lokasi</label>
+<select class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+<option>Zon A - Bangunan Utama</option>
+<option>Zon B - Kawasan Parkir</option>
+<option>Zon C - Gudang & Stor</option>
+<option>Zon D - Kawasan Perimeter</option>
+</select>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Penerangan</label>
+<textarea class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500" rows="3" placeholder="Terangkan kejadian dengan terperinci..."></textarea>
+</div>
+</div>
+<div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+<button onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-white">Batal</button>
+<button onclick="submitIncident()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl">Hantar Laporan</button>
+</div>
+</div>
+
+<!-- Add Guard Modal -->
+<div id="addGuardModal" class="modal-content hidden bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden slide-in">
+<div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+<h3 class="font-bold text-slate-800">Tambah Pengawal Baharu</h3>
+<button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+</div>
+<div class="p-6 space-y-4">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Nama Penuh</label>
+<input type="text" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama penuh">
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">No. Kad Pengenalan</label>
+<input type="text" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="880101-01-1234">
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">No. Telefon</label>
+<input type="text" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="+60 12-345 6789">
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Emel</label>
+<input type="email" class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="email@contoh.com">
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-slate-700 mb-1">Alamat</label>
+<textarea class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2" placeholder="Alamat penuh"></textarea>
+</div>
+</div>
+<div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+<button onclick="closeModal()" class="px-4 py-2 border border-slate-200 rounded-xl text-sm font-medium text-slate-600 hover:bg-white">Batal</button>
+<button onclick="submitNewGuard()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl">Tambah Pengawal</button>
+</div>
+</div>
+</div>
+
+<script>
+// Data
+const guards = [
+{ id: 'PG-05', name: 'Ahmad bin Ismail', phone: '+60 12-345 6789', zone: 'A', status: 'active', shift: 'Pagi', avatar: 'AI', color: 'from-blue-500 to-blue-600' },
+{ id: 'PG-12', name: 'Rajesh a/l Kumar', phone: '+60 13-456 7890', zone: 'B', status: 'active', shift: 'Petang', avatar: 'RK', color: 'from-emerald-500 to-emerald-600' },
+{ id: 'PG-08', name: 'Sarah binti Abdullah', phone: '+60 14-567 8901', zone: 'C', status: 'active', shift: 'Petang', avatar: 'SA', color: 'from-purple-500 to-purple-600' },
+{ id: 'PG-03', name: 'Tan Wei Ming', phone: '+60 15-678 9012', zone: 'A', status: 'offduty', shift: '-', avatar: 'TW', color: 'from-orange-500 to-orange-600' },
+{ id: 'PG-15', name: 'Kumar a/l Raj', phone: '+60 16-789 0123', zone: 'D', status: 'leave', shift: '-', avatar: 'KR', color: 'from-pink-500 to-pink-600' },
+{ id: 'PG-21', name: 'Fatimah binti Yusof', phone: '+60 17-890 1234', zone: 'B', status: 'active', shift: 'Malam', avatar: 'FY', color: 'from-teal-500 to-teal-600' },
+];
+
+const patrols = [
+{ id: 'RP-2026-061', guard: 'Ahmad bin Ismail', guardId: 'PG-05', zone: 'A', startTime: '14:00', checkpoints: '8/12', status: 'active', progress: 67 },
+{ id: 'RP-2026-062', guard: 'Rajesh a/l Kumar', guardId: 'PG-12', zone: 'B', startTime: '14:30', checkpoints: '5/10', status: 'active', progress: 50 },
+{ id: 'RP-2026-063', guard: 'Sarah binti Abdullah', guardId: 'PG-08', zone: 'C', startTime: '15:00', checkpoints: '3/8', status: 'active', progress: 38 },
+{ id: 'RP-2026-064', guard: 'Fatimah binti Yusof', guardId: 'PG-21', zone: 'D', startTime: '16:00', checkpoints: '1/10', status: 'active', progress: 10 },
+];
+
+const incidents = [
+{ id: 'INC-2026-089', title: 'Pintu belakang tidak dikunci', type: 'security', severity: 'medium', zone: 'Zon C', reporter: 'Sarah binti Abdullah', time: '32 minit lalu', status: 'open', description: 'Pemeriksaan rutin mendapati pintu kecemasan belakang tidak dikunci. Tiada tanda pecah masuk.' },
+{ id: 'INC-2026-090', title: 'Lampu keselamatan rosak', type: 'maintenance', severity: 'low', zone: 'Zon A', reporter: 'Ahmad bin Ismail', time: '1 jam lalu', status: 'open', description: 'Tiga unit lampu LED di koridor aras 2 tidak menyala. Keadaan gelap sedikit.' },
+{ id: 'INC-2026-091', title: 'Kenderaan tidak dikenali', type: 'security', severity: 'high', zone: 'Zon B', reporter: 'Rajesh a/l Kumar', time: '2 jam lalu', status: 'open', description: 'Kenderaan van putih tanpa tanda syarikat dilihat berlegar di kawasan parkir staf selepas jam 12 malam.' },
+];
+
+const checkpoints = [
+{ id: 'CP-01', name: 'Pintu Utama', zone: 'A', type: 'RFID', status: 'active', lastCheck: '5 minit lalu' },
+{ id: 'CP-02', name: 'Lobi Aras 1', zone: 'A', type: 'QR Code', status: 'active', lastCheck: '12 minit lalu' },
+{ id: 'CP-03', name: 'Tangga Kecemasan', zone: 'A', type: 'RFID', status: 'active', lastCheck: '2 minit lalu' },
+{ id: 'CP-04', name: 'Pintu Parkir A', zone: 'B', type: 'RFID', status: 'maintenance', lastCheck: '2 jam lalu' },
+{ id: 'CP-05', name: 'Pintu Parkir B', zone: 'B', type: 'RFID', status: 'active', lastCheck: '8 minit lalu' },
+{ id: 'CP-06', name: 'Gudang Utama', zone: 'C', type: 'QR Code', status: 'active', lastCheck: '15 minit lalu' },
+{ id: 'CP-07', name: 'Stor Bahan Api', zone: 'C', type: 'RFID', status: 'active', lastCheck: '20 minit lalu' },
+{ id: 'CP-08', name: 'Pagar Hadapan', zone: 'D', type: 'RFID', status: 'broken', lastCheck: '5 jam lalu' },
+];
+
+// Auth
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+e.preventDefault();
+document.getElementById('loginScreen').classList.add('hidden');
+document.getElementById('mainApp').classList.remove('hidden');
+showToast('Log masuk berjaya! Selamat datang ke PHPATROL.', 'success');
+startClock();
+renderAll();
+});
+
+function logout() {
+document.getElementById('mainApp').classList.add('hidden');
+document.getElementById('loginScreen').classList.remove('hidden');
+showToast('Anda telah log keluar.', 'info');
+}
+
+// Navigation
+function switchTab(tabId) {
+document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+document.getElementById('tab-' + tabId).classList.remove('hidden');
+document.getElementById('tab-' + tabId).classList.add('fade-in');
+
+document.querySelectorAll('.nav-item').forEach(el => {
+el.classList.remove('bg-blue-50', 'text-blue-600');
+el.classList.add('text-slate-600');
+});
+const activeNav = document.querySelector('[data-tab="' + tabId + '"]');
+if (activeNav) {
+activeNav.classList.add('bg-blue-50', 'text-blue-600');
+activeNav.classList.remove('text-slate-600');
+}
+
+const titles = {
+dashboard: ['Papan Pemuka', 'Ringkasan sistem keselamatan'],
+patrol: ['Rondaan', 'Urus dan pantau rondaan'],
+guards: ['Pengawal', 'Urus maklumat pengawal'],
+incidents: ['Kejadian', 'Lapor dan urus kejadian'],
+checkpoints: ['Pusat Pemeriksaan', 'Urus pusat pemeriksaan RFID/QR'],
+reports: ['Laporan', 'Jana dan eksport laporan']
+};
+document.getElementById('pageTitle').textContent = titles[tabId][0];
+document.getElementById('pageSubtitle').textContent = titles[tabId][1];
+
+if (window.innerWidth < 1024) {
+document.getElementById('sidebar').classList.add('-translate-x-full');
+document.getElementById('sidebarOverlay').classList.add('hidden');
+}
+}
+
+// Mobile sidebar
+document.getElementById('menuBtn').addEventListener('click', function() {
+document.getElementById('sidebar').classList.remove('-translate-x-full');
+document.getElementById('sidebarOverlay').classList.remove('hidden');
+});
+document.getElementById('closeSidebar').addEventListener('click', function() {
+document.getElementById('sidebar').classList.add('-translate-x-full');
+document.getElementById('sidebarOverlay').classList.add('hidden');
+});
+document.getElementById('sidebarOverlay').addEventListener('click', function() {
+document.getElementById('sidebar').classList.add('-translate-x-full');
+document.getElementById('sidebarOverlay').classList.add('hidden');
+});
+
+// Render Functions
+function renderAll() {
+renderPatrolTable();
+renderActivePatrols();
+renderGuards();
+renderIncidents();
+renderCheckpoints();
+updateIncidentBadge();
+}
+
+function renderPatrolTable() {
+const tbody = document.getElementById('patrolTableBody');
+tbody.innerHTML = patrols.map(p => 
+'<tr class="hover:bg-slate-50 transition-colors">' +
+'<td class="px-6 py-4 font-mono text-xs text-slate-500">' + p.id + '</td>' +
+'<td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-[10px] font-bold">' + p.guardId + '</div><span class="font-medium text-slate-800">' + p.guard + '</span></div></td>' +
+'<td class="px-6 py-4"><span class="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-lg font-medium">Zon ' + p.zone + '</span></td>' +
+'<td class="px-6 py-4 text-slate-600">' + p.startTime + '</td>' +
+'<td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:' + p.progress + '%"></div></div><span class="text-xs text-slate-500">' + p.checkpoints + '</span></div></td>' +
+'<td class="px-6 py-4"><span class="px-2 py-1 bg-emerald-50 text-emerald-700 text-xs rounded-full font-medium flex items-center gap-1 w-fit"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Berjalan</span></td>' +
+'<td class="px-6 py-4"><button class="view-patrol-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-id="' + p.id + '">Lihat</button></td>' +
+'</tr>'
+).join('');
+}
+
+function renderActivePatrols() {
+const container = document.getElementById('activePatrols');
+container.innerHTML = patrols.map(p => 
+'<div class="p-4 rounded-xl border border-slate-200 hover:border-blue-300 transition-all bg-white">' +
+'<div class="flex items-start justify-between mb-3">' +
+'<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold shadow-md">' + p.guardId + '</div><div><p class="font-semibold text-slate-800">' + p.guard + '</p><p class="text-xs text-slate-500">' + p.id + ' &bull; Zon ' + p.zone + '</p></div></div>' +
+'<span class="px-2 py-1 bg-emerald-50 text-emerald-700 text-xs rounded-full font-medium">Aktif</span>' +
+'</div>' +
+'<div class="space-y-2">' +
+'<div class="flex justify-between text-sm"><span class="text-slate-500">Kemajuan</span><span class="font-medium text-slate-700">' + p.progress + '%</span></div>' +
+'<div class="h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full" style="width:' + p.progress + '%"></div></div>' +
+'<div class="flex justify-between text-xs text-slate-400"><span>Mula: ' + p.startTime + '</span><span>' + p.checkpoints + ' disahkan</span></div>' +
+'</div>' +
+'<div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">' +
+'<button class="view-patrol-btn flex-1 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" data-id="' + p.id + '">Lihat Butiran</button>' +
+'<button class="end-patrol-btn flex-1 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" data-id="' + p.id + '">Tamatkan</button>' +
+'</div>' +
+'</div>'
+).join('');
+}
+
+function renderGuards() {
+const grid = document.getElementById('guardsGrid');
+const filter = document.getElementById('guardFilter').value;
+const search = document.getElementById('guardSearch').value.toLowerCase();
+
+const filtered = guards.filter(g => {
+const matchFilter = filter === 'all' || g.status === filter;
+const matchSearch = g.name.toLowerCase().includes(search) || g.id.toLowerCase().includes(search);
+return matchFilter && matchSearch;
+});
+
+const statusColors = { active: 'bg-emerald-50 text-emerald-700 border-emerald-200', offduty: 'bg-slate-50 text-slate-600 border-slate-200', leave: 'bg-amber-50 text-amber-700 border-amber-200' };
+const statusLabels = { active: 'Aktif', offduty: 'Tidak Bertugas', leave: 'Cuti' };
+
+grid.innerHTML = filtered.map(g => 
+'<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:shadow-md transition-all group">' +
+'<div class="flex items-start justify-between mb-4">' +
+'<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-gradient-to-br ' + g.color + ' flex items-center justify-center text-white font-bold text-sm shadow-md">' + g.avatar + '</div><div><p class="font-semibold text-slate-800">' + g.name + '</p><p class="text-xs text-slate-500">' + g.id + '</p></div></div>' +
+'<span class="px-2 py-1 ' + statusColors[g.status] + ' text-xs rounded-full font-medium border">' + statusLabels[g.status] + '</span>' +
+'</div>' +
+'<div class="space-y-2 text-sm mb-4">' +
+'<div class="flex items-center gap-2 text-slate-600"><i class="fas fa-phone text-slate-400 w-4 text-center text-xs"></i><span>' + g.phone + '</span></div>' +
+'<div class="flex items-center gap-2 text-slate-600"><i class="fas fa-map-marker-alt text-slate-400 w-4 text-center text-xs"></i><span>Zon ' + g.zone + '</span></div>' +
+'<div class="flex items-center gap-2 text-slate-600"><i class="fas fa-clock text-slate-400 w-4 text-center text-xs"></i><span>Shift: ' + g.shift + '</span></div>' +
+'</div>' +
+'<div class="flex gap-2 pt-3 border-t border-slate-100">' +
+'<button class="flex-1 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">Lihat Profil</button>' +
+'<button class="px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"><i class="fas fa-edit"></i></button>' +
+'</div>' +
+'</div>'
+).join('');
+}
+
+function filterGuards() {
+renderGuards();
+}
+
+function renderIncidents() {
+const container = document.getElementById('incidentsList');
+const activeBtn = document.querySelector('.incident-filter.bg-blue-600');
+const filter = activeBtn ? activeBtn.dataset.filter : 'all';
+
+const filtered = filter === 'all' ? incidents : incidents.filter(i => i.status === filter);
+
+const severityColors = { high: 'border-l-4 border-l-red-500', medium: 'border-l-4 border-l-amber-500', low: 'border-l-4 border-l-blue-500' };
+const severityLabels = { high: 'Tinggi', medium: 'Sederhana', low: 'Rendah' };
+const severityBg = { high: 'bg-red-50 text-red-700', medium: 'bg-amber-50 text-amber-700', low: 'bg-blue-50 text-blue-700' };
+const statusColors = { open: 'bg-red-100 text-red-700', resolved: 'bg-emerald-100 text-emerald-700' };
+const statusLabels = { open: 'Belum Selesai', resolved: 'Selesai' };
+
+container.innerHTML = filtered.map(inc => 
+'<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 ' + severityColors[inc.severity] + ' hover:shadow-md transition-all">' +
+'<div class="flex items-start justify-between mb-3">' +
+'<div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full ' + (inc.severity === 'high' ? 'bg-red-100' : inc.severity === 'medium' ? 'bg-amber-100' : 'bg-blue-100') + ' flex items-center justify-center"><i class="fas fa-exclamation-triangle ' + (inc.severity === 'high' ? 'text-red-600' : inc.severity === 'medium' ? 'text-amber-600' : 'text-blue-600') + ' text-sm"></i></div><div><p class="font-semibold text-slate-800">' + inc.title + '</p><p class="text-xs text-slate-500">' + inc.id + ' &bull; ' + inc.time + '</p></div></div>' +
+'<div class="flex gap-2"><span class="px-2 py-1 ' + severityBg[inc.severity] + ' text-xs rounded-full font-medium">' + severityLabels[inc.severity] + '</span><span class="px-2 py-1 ' + statusColors[inc.status] + ' text-xs rounded-full font-medium">' + statusLabels[inc.status] + '</span></div>' +
+'</div>' +
+'<p class="text-sm text-slate-600 mb-3">' + inc.description + '</p>' +
+'<div class="flex items-center justify-between text-xs text-slate-500">' +
+'<div class="flex items-center gap-4"><span><i class="fas fa-map-marker-alt mr-1"></i>' + inc.zone + '</span><span><i class="fas fa-user mr-1"></i>' + inc.reporter + '</span></div>' +
+'<div class="flex gap-2">' + (inc.status === 'open' ? '<button class="resolve-incident-btn px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium hover:bg-emerald-100 transition-colors" data-id="' + inc.id + '">Tandakan Selesai</button>' : '') + '<button class="px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg font-medium hover:bg-slate-100 transition-colors">Butiran</button></div>' +
+'</div>' +
+'</div>'
+).join('');
+
+document.getElementById('highCount').textContent = incidents.filter(i => i.severity === 'high' && i.status === 'open').length;
+document.getElementById('mediumCount').textContent = incidents.filter(i => i.severity === 'medium' && i.status === 'open').length;
+document.getElementById('lowCount').textContent = incidents.filter(i => i.severity === 'low' && i.status === 'open').length;
+}
+
+function filterIncidents(filter) {
+document.querySelectorAll('.incident-filter').forEach(btn => {
+btn.classList.remove('bg-blue-600', 'text-white');
+btn.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+});
+const activeBtn = document.querySelector('[data-filter="' + filter + '"]');
+activeBtn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+activeBtn.classList.add('bg-blue-600', 'text-white');
+renderIncidents();
+}
+
+function renderCheckpoints() {
+const tbody = document.getElementById('checkpointsTable');
+const statusColors = { active: 'bg-emerald-50 text-emerald-700', maintenance: 'bg-amber-50 text-amber-700', broken: 'bg-red-50 text-red-700' };
+const statusLabels = { active: 'Aktif', maintenance: 'Penyelenggaraan', broken: 'Rosak' };
+
+tbody.innerHTML = checkpoints.map(cp => 
+'<tr class="hover:bg-slate-50 transition-colors">' +
+'<td class="px-6 py-4 font-mono text-xs text-slate-500">' + cp.id + '</td>' +
+'<td class="px-6 py-4 font-medium text-slate-800">' + cp.name + '</td>' +
+'<td class="px-6 py-4"><span class="px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-lg font-medium">Zon ' + cp.zone + '</span></td>' +
+'<td class="px-6 py-4"><span class="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-lg font-medium">' + cp.type + '</span></td>' +
+'<td class="px-6 py-4"><span class="px-2 py-1 ' + statusColors[cp.status] + ' text-xs rounded-full font-medium">' + statusLabels[cp.status] + '</span></td>' +
+'<td class="px-6 py-4 text-slate-500 text-xs">' + cp.lastCheck + '</td>' +
+'</tr>'
+).join('');
+}
+
+function updateIncidentBadge() {
+const openCount = incidents.filter(i => i.status === 'open').length;
+const badge = document.getElementById('incidentBadge');
+const notifBadge = document.getElementById('notifBadge');
+if (openCount > 0) {
+badge.textContent = openCount;
+badge.classList.remove('hidden');
+notifBadge.textContent = openCount;
+notifBadge.classList.remove('hidden');
+} else {
+badge.classList.add('hidden');
+notifBadge.classList.add('hidden');
+}
+document.getElementById('dashIncidentCount').textContent = openCount;
+}
+
+// Actions
+function refreshData() {
+const icon = document.getElementById('refreshIcon');
+icon.classList.add('fa-spin');
+setTimeout(() => {
+icon.classList.remove('fa-spin');
+showToast('Data telah dikemas kini.', 'success');
+}, 1000);
+}
+
+function startNewPatrol() {
+document.getElementById('modalOverlay').classList.remove('hidden');
+document.getElementById('startPatrolModal').classList.remove('hidden');
+}
+
+function confirmStartPatrol() {
+closeModal();
+showToast('Rondaan baharu telah dimulakan!', 'success');
+}
+
+function endPatrol(id) {
+if (confirm('Adakah anda pasti mahu menamatkan rondaan ini?')) {
+const idx = patrols.findIndex(p => p.id === id);
+if (idx > -1) patrols.splice(idx, 1);
+renderAll();
+showToast('Rondaan telah ditamatkan.', 'info');
+}
+}
+
+function reportIncident() {
+document.getElementById('modalOverlay').classList.remove('hidden');
+document.getElementById('reportIncidentModal').classList.remove('hidden');
+}
+
+function submitIncident() {
+closeModal();
+showToast('Kejadian telah dilaporkan berjaya.', 'success');
+}
+
+function resolveIncident(id) {
+const inc = incidents.find(i => i.id === id);
+if (inc) {
+inc.status = 'resolved';
+renderAll();
+showToast('Kejadian ditandakan sebagai selesai.', 'success');
+}
+}
+
+function addGuard() {
+document.getElementById('modalOverlay').classList.remove('hidden');
+document.getElementById('addGuardModal').classList.remove('hidden');
+}
+
+function submitNewGuard() {
+closeModal();
+showToast('Pengawal baharu telah ditambah.', 'success');
+}
+
+function viewPatrol(id) {
+showToast('Memaparkan butiran rondaan ' + id, 'info');
+}
+
+function toggleNotifications() {
+showToast('Tiada pemberitahuan baharu.', 'info');
+}
+
+// Event delegation for dynamically rendered action buttons.
+// This replaces the old inline onclick="...(' ' + id + ' ')" pattern, which required
+// manually escaping quotes and previously caused a JS syntax error that broke the
+// entire script (nothing in the app worked, including login).
+document.addEventListener('click', function(e) {
+const viewBtn = e.target.closest('.view-patrol-btn');
+if (viewBtn) { viewPatrol(viewBtn.dataset.id); return; }
+
+const endBtn = e.target.closest('.end-patrol-btn');
+if (endBtn) { endPatrol(endBtn.dataset.id); return; }
+
+const resolveBtn = e.target.closest('.resolve-incident-btn');
+if (resolveBtn) { resolveIncident(resolveBtn.dataset.id); return; }
+});
+
+// Modal Utils
+function closeModal() {
+document.getElementById('modalOverlay').classList.add('hidden');
+document.querySelectorAll('.modal-content').forEach(m => m.classList.add('hidden'));
+}
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+if (e.target === this) closeModal();
+});
+
+// Toast
+function showToast(message, type) {
+const container = document.getElementById('toastContainer');
+const toast = document.createElement('div');
+
+const colors = { success: 'bg-emerald-500', error: 'bg-red-500', warning: 'bg-amber-500', info: 'bg-blue-500' };
+const icons = { success: 'fa-check-circle', error: 'fa-times-circle', warning: 'fa-exclamation-circle', info: 'fa-info-circle' };
+
+toast.className = 'toast-enter pointer-events-auto flex items-center gap-3 px-5 py-3.5 ' + colors[type] + ' text-white rounded-xl shadow-lg min-w-[300px]';
+toast.innerHTML = '<i class="fas ' + icons[type] + ' text-lg"></i><span class="text-sm font-medium">' + message + '</span><button onclick="this.parentElement.remove()" class="ml-auto text-white/70 hover:text-white"><i class="fas fa-times"></i></button>';
+
+container.appendChild(toast);
+setTimeout(() => {
+toast.style.opacity = '0';
+toast.style.transform = 'translateX(100%)';
+toast.style.transition = 'all 0.3s ease';
+setTimeout(() => toast.remove(), 300);
+}, 4000);
+}
+
+// Clock
+function startClock() {
+function update() {
+const now = new Date();
+document.getElementById('liveClock').textContent = now.toLocaleTimeString('ms-MY', { hour12: false });
+}
+update();
+setInterval(update, 1000);
+}
+</script>
+
+</body>
+</html>
