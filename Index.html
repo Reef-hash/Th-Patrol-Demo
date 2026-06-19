@@ -739,7 +739,7 @@ tbody.innerHTML = patrols.map(p =>
 '<td class="px-6 py-4 text-slate-600">' + p.startTime + '</td>' +
 '<td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-20 h-2 bg-slate-100 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:' + p.progress + '%"></div></div><span class="text-xs text-slate-500">' + p.checkpoints + '</span></div></td>' +
 '<td class="px-6 py-4"><span class="px-2 py-1 bg-emerald-50 text-emerald-700 text-xs rounded-full font-medium flex items-center gap-1 w-fit"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>Berjalan</span></td>' +
-'<td class="px-6 py-4"><button onclick="viewPatrol('' + p.id + '')" class="text-blue-600 hover:text-blue-800 text-sm font-medium">Lihat</button></td>' +
+'<td class="px-6 py-4"><button class="view-patrol-btn text-blue-600 hover:text-blue-800 text-sm font-medium" data-id="' + p.id + '">Lihat</button></td>' +
 '</tr>'
 ).join('');
 }
@@ -758,8 +758,8 @@ container.innerHTML = patrols.map(p =>
 '<div class="flex justify-between text-xs text-slate-400"><span>Mula: ' + p.startTime + '</span><span>' + p.checkpoints + ' disahkan</span></div>' +
 '</div>' +
 '<div class="flex gap-2 mt-3 pt-3 border-t border-slate-100">' +
-'<button onclick="viewPatrol('' + p.id + '')" class="flex-1 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">Lihat Butiran</button>' +
-'<button onclick="endPatrol('' + p.id + '')" class="flex-1 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">Tamatkan</button>' +
+'<button class="view-patrol-btn flex-1 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" data-id="' + p.id + '">Lihat Butiran</button>' +
+'<button class="end-patrol-btn flex-1 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" data-id="' + p.id + '">Tamatkan</button>' +
 '</div>' +
 '</div>'
 ).join('');
@@ -824,7 +824,7 @@ container.innerHTML = filtered.map(inc =>
 '<p class="text-sm text-slate-600 mb-3">' + inc.description + '</p>' +
 '<div class="flex items-center justify-between text-xs text-slate-500">' +
 '<div class="flex items-center gap-4"><span><i class="fas fa-map-marker-alt mr-1"></i>' + inc.zone + '</span><span><i class="fas fa-user mr-1"></i>' + inc.reporter + '</span></div>' +
-'<div class="flex gap-2">' + (inc.status === 'open' ? '<button onclick="resolveIncident('' + inc.id + '')" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium hover:bg-emerald-100 transition-colors">Tandakan Selesai</button>' : '') + '<button class="px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg font-medium hover:bg-slate-100 transition-colors">Butiran</button></div>' +
+'<div class="flex gap-2">' + (inc.status === 'open' ? '<button class="resolve-incident-btn px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium hover:bg-emerald-100 transition-colors" data-id="' + inc.id + '">Tandakan Selesai</button>' : '') + '<button class="px-3 py-1.5 bg-slate-50 text-slate-600 rounded-lg font-medium hover:bg-slate-100 transition-colors">Butiran</button></div>' +
 '</div>' +
 '</div>'
 ).join('');
@@ -943,6 +943,21 @@ showToast('Memaparkan butiran rondaan ' + id, 'info');
 function toggleNotifications() {
 showToast('Tiada pemberitahuan baharu.', 'info');
 }
+
+// Event delegation for dynamically rendered action buttons.
+// This replaces the old inline onclick="...(' ' + id + ' ')" pattern, which required
+// manually escaping quotes and previously caused a JS syntax error that broke the
+// entire script (nothing in the app worked, including login).
+document.addEventListener('click', function(e) {
+const viewBtn = e.target.closest('.view-patrol-btn');
+if (viewBtn) { viewPatrol(viewBtn.dataset.id); return; }
+
+const endBtn = e.target.closest('.end-patrol-btn');
+if (endBtn) { endPatrol(endBtn.dataset.id); return; }
+
+const resolveBtn = e.target.closest('.resolve-incident-btn');
+if (resolveBtn) { resolveIncident(resolveBtn.dataset.id); return; }
+});
 
 // Modal Utils
 function closeModal() {
